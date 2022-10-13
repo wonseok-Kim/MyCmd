@@ -37,34 +37,7 @@ auto Execute(std::span<const Token> tokens) -> void
 
     TCHAR commandLine[COMMAND_LINE_LENGTH] = { 0, };
     STARTUPINFO si = { sizeof(si), 0, };
-    PROCESS_INFORMATION pi = { 0, };
-    SECURITY_ATTRIBUTES saFile = { 0, };
-    saFile.nLength = sizeof(saFile);
-    saFile.bInheritHandle = true;
-
-    HANDLE hInputFile = GetStdHandle(STD_INPUT_HANDLE);
-    HANDLE hOutputFile = GetStdHandle(STD_OUTPUT_HANDLE);
-
-    if (inFilename)
-    {
-        hInputFile = CreateFile(outFilename->c_str(), GENERIC_READ, FILE_SHARE_READ,
-                                &saFile, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hOutputFile == INVALID_HANDLE_VALUE)
-        {
-            _tprintf(_T("'%s' 파일 열기를 실패했습니다.\n"), outFilename->c_str());
-            return;
-        }
-    }
-    if (outFilename)
-    {
-        hOutputFile = CreateFile(outFilename->c_str(), GENERIC_WRITE, FILE_SHARE_READ,
-                                 &saFile, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hOutputFile == INVALID_HANDLE_VALUE)
-        {
-            _tprintf(_T("'%s' 파일 열기를 실패했습니다.\n"), outFilename->c_str());
-            goto CLOSE_IN_HANDLE;
-        }
-    }
+    PROCESS_INFORMATION pi = { 0, };    
 
     if (*command == _T("start"))
     {
@@ -80,28 +53,68 @@ auto Execute(std::span<const Token> tokens) -> void
     {
         argument += _T('\n');
 
-        DWORD bytesWritten = 0;
-        DWORD bytesToWrite = static_cast<DWORD>(argument.length() * sizeof(TCHAR));
+        FILE* fOut = (FILE*)stdout;
+        FILE* fIn = (FILE*)stdin;
 
-        if (!WriteFile(hOutputFile, argument.c_str(), bytesToWrite, &bytesWritten, NULL))
+        if (inFilename &&
+            _tfopen_s(&fIn, inFilename->c_str(), _T("r")) != 0)
         {
-            _tprintf(_T("'%s' 파일에 쓰기를 실패했습니다.\n"), outFilename->c_str());
-            goto CLOSE_IN_OUT_HANDLE;
+            return;
+        }
+        if (outFilename &&
+            _tfopen_s(&fOut, outFilename->c_str(), _T("w")) != 0)
+        {
+            return;
+        }
+
+        _fputts(argument.c_str(), fOut);
+
+        if (inFilename)
+        {
+            fclose(fIn);
+        }
+        if (outFilename)
+        {
+            fclose(fOut);
         }
     }
     else
     {
-        _stprintf_s(commandLine, COMMAND_LINE_LENGTH,
-                    _T("%s %s"), command->c_str(), argument.c_str());
+        SECURITY_ATTRIBUTES saFile = { 0, };
+        saFile.nLength = sizeof(saFile);
+        saFile.bInheritHandle = true;
 
-        //_stprintf_s(commandLine, COMMAND_LINE_LENGTH,
-        //            _T("%s"), command->c_str());
+        HANDLE hInputFile = GetStdHandle(STD_INPUT_HANDLE);
+        HANDLE hOutputFile = GetStdHandle(STD_OUTPUT_HANDLE);
 
+        if (inFilename)
+        {
+            hInputFile = CreateFile(outFilename->c_str(), GENERIC_READ, FILE_SHARE_READ,
+                                    &saFile, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+            if (hOutputFile == INVALID_HANDLE_VALUE)
+            {
+                _tprintf(_T("'%s' 파일 열기를 실패했습니다.\n"), outFilename->c_str());
+                return;
+            }
+        }
+        if (outFilename)
+        {
+            hOutputFile = CreateFile(outFilename->c_str(), GENERIC_WRITE, FILE_SHARE_READ,
+                                     &saFile, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            if (hOutputFile == INVALID_HANDLE_VALUE)
+            {
+                _tprintf(_T("'%s' 파일 열기를 실패했습니다.\n"), outFilename->c_str());
+                goto CLOSE_IN_HANDLE;
+            }
+        }
 
         si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
         si.hStdInput = hInputFile;
         si.hStdOutput = hOutputFile;
         si.dwFlags |= STARTF_USESTDHANDLES;
+
+        _stprintf_s(commandLine, COMMAND_LINE_LENGTH,
+                    _T("%s %s"), command->c_str(), argument.c_str());
 
         if (!CreateProcess(NULL, commandLine, NULL, NULL, TRUE,
                            0, NULL, NULL, &si, &pi))
@@ -116,16 +129,16 @@ auto Execute(std::span<const Token> tokens) -> void
 
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
-    }
 
-CLOSE_IN_OUT_HANDLE:
-    if (outFilename)
-    {
-        CloseHandle(hOutputFile);
-    }
-CLOSE_IN_HANDLE:
-    if (inFilename)
-    {
-        CloseHandle(hInputFile);
+    CLOSE_IN_OUT_HANDLE:
+        if (outFilename)
+        {
+            CloseHandle(hOutputFile);
+        }
+    CLOSE_IN_HANDLE:
+        if (inFilename)
+        {
+            CloseHandle(hInputFile);
+        }
     }
 }

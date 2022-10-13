@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <format>
 #include <locale.h>
 #include <string>
@@ -19,7 +18,6 @@ auto _tmain(int32_t argc, LPTSTR argv[]) -> int32_t
 {
     _tsetlocale(LC_ALL, _T("Korean"));
 
-    HANDLE hOutFile = GetStdHandle(STD_OUTPUT_HANDLE);
     HANDLE hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hProcessSnap == INVALID_HANDLE_VALUE)
     {
@@ -38,9 +36,7 @@ auto _tmain(int32_t argc, LPTSTR argv[]) -> int32_t
     do
     {
         std::tstring buf = std::format(_T("{:50} {:5}\n"), pe32.szExeFile, pe32.th32ProcessID);
-        DWORD bytesToWrite = static_cast<DWORD>(buf.length() * sizeof TCHAR);
-        DWORD  bytesWritten = 0;
-        WriteFile(hOutFile, buf.data(), bytesToWrite, &bytesWritten, NULL);
+        _fputts(buf.c_str(), stdout);        
     } while (Process32Next(hProcessSnap, &pe32));
 
 

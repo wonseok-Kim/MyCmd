@@ -6,48 +6,32 @@
 #include <vector>
 #include <Windows.h>
 
+namespace std
+{
+#ifdef UNICODE
+    using tstring = wstring;
+#else
+    using tstring = string;
+#endif // UNICODE
+}
+
 auto _tmain(int32_t argc, LPTSTR argv[]) -> int32_t
 {
-    std::vector<std::string> strings{};
-    char inBuffer[100] = { 0, };
+    _tsetlocale(LC_ALL, _T("Korean"));
 
-    HANDLE hInFile = GetStdHandle(STD_INPUT_HANDLE);
-    HANDLE hOutFile = GetStdHandle(STD_OUTPUT_HANDLE);
+    std::vector<std::tstring> strings{};
+    TCHAR inBuffer[100] = { 0, };
 
-    bool bResult = true;
-    DWORD nBytesToRead = static_cast<DWORD>(100);
-    DWORD nBytesRead = 0;
-
-    while (true)
-    {
-        bResult = ReadFile(hInFile, inBuffer, nBytesToRead, &nBytesRead, NULL);
-        if (!bResult)
-        {
-            _tprintf(_T("ReadFile error %d"), GetLastError());
-            return 0;
-        }
-        if (nBytesRead == 0)
-        {
-            break;
-        }
-
-        inBuffer[nBytesRead - 1] = '\0';
-        char* carrigeReturn = strchr(inBuffer, '\r');
-        *carrigeReturn = '\0';
-
+    while (_fgetts(inBuffer, 100, stdin))
+    {        
         strings.push_back(inBuffer);
     }
 
     std::sort(strings.begin(), strings.end());
 
-    DWORD nBytesWritten = 0;
-    unsigned short mark = 0xFEFF;
-    WriteFile(hOutFile, &mark, sizeof(mark), &nBytesWritten, NULL);
     for (auto& str : strings)
     {
-        str += _T('\n');
-        DWORD nBytesToWrite = static_cast<DWORD>(str.length()); 
-        WriteFile(hOutFile, (LPCVOID)str.data(), nBytesToWrite, &nBytesWritten, NULL);
+        _fputts(str.c_str(), stdout);
     }
 
     return 0;
